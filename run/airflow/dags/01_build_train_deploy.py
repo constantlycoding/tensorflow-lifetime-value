@@ -215,6 +215,7 @@ def do_train_model(**kwargs):
                        '--model_type', kwargs['dag_run'].conf.get('model_type')],
         dag=dag
     ).execute(kwargs)
+    kwargs['ti'].xcom_push(key='job_id', value=job_id)
 
 
 t6 = PythonOperator(
@@ -226,11 +227,14 @@ t6 = PythonOperator(
 def do_copy_model_to_final(**kwargs):
     gcs = GoogleCloudStorageHook()
 
+    ti = kwargs['ti']
+
+    job_id = ti.xcom_pull(key='job_id', task_ids='train_model')
     # Returns all the objects within the bucket. All sub-buckets are considered
     # as prefix of the leaves. List does not differentiate files from subbuckets
     all_jobs_files = gcs.list(
         bucket=COMPOSER_BUCKET_NAME,
-        prefix='{}/export/estimate'.format(PREFIX_JOBS_EXPORT)
+        prefix='{}/{}/export/estimate'.format(PREFIX_JOBS_EXPORT, job_id)
     )
 
     # Extract the latest model bucket parent of variables/ and saved_model.pbtxt
